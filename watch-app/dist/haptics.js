@@ -30,22 +30,5 @@ const Haptics = (() => {
     return pattern.filter((_, i) => i % 2 === 0).map(duration => duration === LONG ? 'long' : 'short').join(', ');
   }
 
-  function play(cue, strength, env = { navigator, document }) {
-    const level = Math.max(0, Math.min(3, Math.round(Number(strength) || 0)));
-    if (!level) {
-      try { env.navigator.vibrate?.(0); } catch {}
-      return 'Vibration is off.';
-    }
-    if (typeof env.navigator.vibrate !== 'function') return 'Vibration is unavailable in this browser or device.';
-    if (env.document.hidden) return 'Vibration paused while the page is hidden.';
-    if (env.navigator.userActivation?.hasBeenActive === false) return 'Click or press a key to enable device vibration.';
-    const scale = [0, .65, 1, 1.4][level];
-    const pattern = cue.pattern.map((duration, i) => i % 2 ? duration : Math.round(duration * scale));
-    try {
-      return env.navigator.vibrate(pattern) ? 'Vibration requested; physical feedback depends on your device.' : 'The browser blocked the vibration request.';
-    } catch { return 'The browser could not request vibration.'; }
-  }
-
-  function stop() { try { navigator.vibrate?.(0); } catch {} }
-  return { option, entry, play, stop };
+  return { option, entry };
 })();

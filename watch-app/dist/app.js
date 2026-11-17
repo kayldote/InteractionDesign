@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 const routes=[['01','Bonfire'],['03','Yell Practice'],['04','Gig Em'],['05','Bush School']];
 let page='menu',index=0,route=0,history=[],audio=false,lastWheel=0,wheelTotal=0;
-let settings={rate:1,volume:.5,vibration:2,contrast:false,large:false};
+let settings={rate:1,volume:.5,vibration:2,sounds:false,contrast:false,large:false};
 try{settings={...settings,...JSON.parse(localStorage.getItem('transit-settings')||'{}')}}catch{}
 const save=()=>{try{localStorage.setItem('transit-settings',JSON.stringify(settings))}catch{}};
 const routeName=()=>`Route ${routes[route][0]} — ${routes[route][1]}`;
@@ -14,11 +14,11 @@ function speak(text,force=false){$('transcript').textContent=text;$('live').text
 let hapticProtectedUntil=0;
 function pulse(cue=Haptics.option(page,index,view?.items[index]?.label),protect=false){
   if(!protect&&Date.now()<hapticProtectedUntil)return;
-  const result=Haptics.play(cue,settings.vibration);
+  const result=settings.sounds?RhythmAudio.play(cue.pattern,settings.volume,settings.vibration):'Rhythm sounds are off. Tap Enable rhythm sounds to hear them.';
   if(protect)hapticProtectedUntil=Date.now()+cue.pattern.reduce((total,duration,i)=>total+(i%2?duration:Math.round(duration*[0,.65,1,1.4][settings.vibration]||0)),0);
   $('haptic-status').textContent=`${cue.label}. ${result}`;
 }
-function testVibration(){pulse({pattern:[70,110,280,110,70],label:'Vibration test: short, long, short'},true);speak($('haptic-status').textContent)}
+async function testVibration(){if(!settings.sounds){await toggleSounds();if(!settings.sounds)return}else await RhythmAudio.unlock();pulse({pattern:[70,110,280,110,70],label:'Rhythm test: short, long, short'},true)}
 let view;
 function getView(){switch(page){
 case 'routes':return {title:'Bus routes',intro:'Bus routes. Scroll to explore, then press Enter or Left-click to select.',items:routes.map((r,i)=>item(`Route ${r[0]} — ${r[1]}`,()=>{route=i;go('route')},'bus'))};
@@ -32,9 +32,9 @@ case 'boarded':return {title:'You’re on your way',detail:`<span class="hero-ic
 case 'departures':return {title:'Next departures',detail:`<strong>${routeName()}</strong>Sample departures<br>8 min · 23 min · 38 min`,items:[item('Navigate to stop',()=>go('leave')),item('Back to route',back)]};
 case 'access':return {title:'Accessibility info',detail:'<strong>Sample bus features</strong>Wheelchair access<br>Audio announcements<br>Kneeling bus<br>Ramp available<small>Verify with transit before travel.</small>',intro:'Sample accessibility information: wheelchair access, audio announcements, kneeling bus, and ramp. Verify with your transit service before travel.',items:[item('Repeat details',()=>repeat()),...(history.at(-1)?.page==='reached'?[item('Cancel navigation',menu)]:[])]};
 case 'menu':return {title:'Main menu',items:[item('Access routes',()=>go('routes'),'bus'),item('Customize',()=>go('customize'),'⚙'),item('Contact support',()=>go('support'),'?')]};
-case 'customize':return {title:'Customize',items:[item('Audio settings',()=>go('audioSettings')),item('Vibration strength',()=>go('vibration')),item('Extra contrast',()=>toggle('contrast')),item(settings.large?'Smaller text':'Larger text',()=>toggle('large'))]};
-case 'audioSettings':return {title:'Audio settings',items:[item(audio?'Spoken guidance: on':'Spoken guidance: off',toggleAudio),item('Voice speed',()=>go('rate')),item('Volume level',()=>go('volume'))]};
-case 'rate':case 'volume':case 'vibration':{const title={rate:'Voice speed',volume:'Volume level',vibration:'Vibration strength'}[page];const value=page==='rate'?settings.rate.toFixed(1)+'×':page==='volume'?Math.round(settings.volume*100)+'%':['Off','Light','Medium','Strong'][settings.vibration];return {title,detail:`<div class="setting-value">${value}</div><div class="setting-hint">Scroll to adjust. Click an action below to activate.</div>${page==='vibration'?'<p class="setting-hint">Strength changes pulse duration. Device vibration support is required.</p>':''}`,adjust:true,items:[item(page==='vibration'?'Test vibration':'Test sound',()=>{if(page==='vibration'){testVibration()}else speak('Your journey. One turn away. This is your audio test.',true)}),item('Save & go back',back)]}}
+case 'customize':return {title:'Customize',items:[item('Audio settings',()=>go('audioSettings')),item('Rhythm length',()=>go('vibration')),item('Extra contrast',()=>toggle('contrast')),item(settings.large?'Smaller text':'Larger text',()=>toggle('large'))]};
+case 'audioSettings':return {title:'Audio settings',items:[item(audio?'Spoken guidance: on':'Spoken guidance: off',toggleAudio),item(settings.sounds?'Rhythm sounds: on':'Rhythm sounds: off',toggleSounds),item('Voice speed',()=>go('rate')),item('Volume level',()=>go('volume'))]};
+case 'rate':case 'volume':case 'vibration':{const title={rate:'Voice speed',volume:'Volume level',vibration:'Rhythm length'}[page];const value=page==='rate'?settings.rate.toFixed(1)+'×':page==='volume'?Math.round(settings.volume*100)+'%':['Off','Shorter','Standard','Longer'][settings.vibration];return {title,detail:`<div class="setting-value">${value}</div><div class="setting-hint">Scroll to adjust. Click an action below to activate.</div>${page==='vibration'?'<p class="setting-hint">Short and long beeps represent the watch’s vibration patterns.</p>':''}`,adjust:true,items:[item(page==='vibration'?'Test rhythm':'Test sound',()=>{if(page==='vibration'){testVibration()}else speak('Your journey. One turn away. This is your audio test.',true)}),item('Save & go back',back)]}}
 case 'support':return {title:'Contact support',detail:'<strong>Prototype support</strong>No transit service is connected.<small>For real assistance, use your transit provider’s official contact details.</small>',items:[item('Back to menu',menu),item('Back to routes',home)]};
 default:return {title:'Bus routes',items:[]};}}
 function render(announce=false){view=getView();$('title').textContent=view.title;const backButton=$('back');backButton.disabled=!history.length;const backSelected=history.length&&!view.adjust&&index===-1;backButton.classList.toggle('selected',backSelected);if(backSelected)backButton.setAttribute('aria-current','true');else backButton.removeAttribute('aria-current');const content=$('content');content.innerHTML=(view.detail?`<div class="detail">${view.detail}</div>`:'')+view.items.map((o,i)=>`<button tabindex="-1" class="option ${i===index?'selected':''}" aria-label="${o.label}" ${i===index?'aria-current="true"':''} data-option="${i}">${o.icon==='bus'?'<img src="assets/bus.png" width="28" height="28" alt="">':o.icon?`<span aria-hidden="true">${o.icon}</span>`:''}<span>${o.label}</span>${page==='routes'?'':'<span class="chevron" aria-hidden="true">›</span>'}</button>`).join('');content.querySelectorAll('.option').forEach((el,i)=>{el.addEventListener('click',()=>{index=i;select()});el.addEventListener('pointerenter',()=>pulse(Haptics.option(page,i,view.items[i]?.label)));el.addEventListener('focus',()=>pulse(Haptics.option(page,i,view.items[i]?.label)));});if(!announce&&!view.adjust){const el=content.querySelector('.selected');if(el)content.scrollTop=Math.max(0,el.offsetTop-content.offsetTop-45)}else content.scrollTop=0;if(announce){speak(`${view.intro||view.title+'.'} ${backSelected?'Back':view.items[index]?.label||view.title}.`);pulse(Haptics.entry(page,index,view.items[index]?.label),true);}}
@@ -50,5 +50,15 @@ document.addEventListener('keydown',e=>{if(e.altKey||e.ctrlKey||e.metaKey)return
 $('previous').onclick=()=>view.adjust?adjustValue(-1):move(-1);$('next').onclick=()=>view.adjust?adjustValue(1):move(1);$('select').onclick=select;$('crown').onclick=select;$('side').onclick=menu;$('back').onclick=back;$('menu').onclick=menu;$('home').onclick=e=>{e.preventDefault();menu()};$('audio').onclick=toggleAudio;$('start').onclick=()=>{if(!audio)toggleAudio();$('watch').focus()};$('repeat').onclick=repeat;['contrast','large'].forEach(key=>$(key).onchange=()=>toggle(key));
 function clock(){ $('time').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}clock();setInterval(clock,30000);applyPreferences();render();
 
-document.addEventListener('visibilitychange',()=>{if(document.hidden)Haptics.stop()});
-window.addEventListener('pagehide',Haptics.stop);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)RhythmAudio.stop()});
+window.addEventListener('pagehide',RhythmAudio.stop);
+
+async function toggleSounds(){
+  if(settings.sounds){settings.sounds=false;RhythmAudio.stop();$('haptic-status').textContent='Rhythm sounds are off.'}
+  else {settings.sounds=await RhythmAudio.unlock();if(settings.sounds)pulse({pattern:[70,110,280,110,70],label:'Rhythm test: short, long, short'},true);else $('haptic-status').textContent='Audio is unavailable. Try enabling rhythm sounds again.'}
+  save();updateSoundsButton();if(page==='audioSettings')render();
+}
+function updateSoundsButton(){$('sounds').textContent=settings.sounds?'Turn rhythm sounds off':'Enable rhythm sounds';$('sounds').setAttribute('aria-pressed',String(settings.sounds))}
+$('sounds').onclick=toggleSounds;
+// Always ask for a fresh tap on a new page load to unlock mobile audio.
+settings.sounds=false;updateSoundsButton();
