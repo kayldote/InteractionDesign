@@ -62,3 +62,16 @@ function updateSoundsButton(){$('sounds').textContent=settings.sounds?'Turn rhyt
 $('sounds').onclick=toggleSounds;
 // Always ask for a fresh tap on a new page load to unlock mobile audio.
 settings.sounds=false;updateSoundsButton();
+
+// Move the existing buttons rather than duplicate them, preserving audio state
+// and activation handlers when the viewport changes.
+if(window.matchMedia){
+  const mobileAudioLayout=window.matchMedia('(max-width: 700px)');
+  function positionAudioControls(){
+    const controls=$('mobile-audio-controls');
+    if(mobileAudioLayout.matches){controls.append($('audio'),$('sounds'))}
+    else{$('audio-home').append($('audio'));$('sounds-home').append($('sounds'))}
+  }
+  mobileAudioLayout.addEventListener('change',positionAudioControls);
+  positionAudioControls();
+}
