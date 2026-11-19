@@ -24,3 +24,11 @@ Use **Customize → Rhythm length → Test rhythm** to replay the test. Shorter 
 At Standard length, short tones last 70 ms, long tones 280 ms, with 110 ms gaps. Web Audio schedules the rhythm with gentle volume ramps to avoid clicks. Only cues for existing screens are wired; language and accessibility-error screens remain outside this prototype.
 
 Run `node --test watch-app/tests/haptics.test.cjs` from the repository root to check rhythm mappings, Web Audio scheduling, activation, mute behavior, navigation, and fallback handling. These automated checks do not replace listening on physical iPhone and Android devices.
+
+## Navigation and learning
+
+Every watch screen has a flat Back button on the left side, a flat Home button on the right side, with navigation controls outside the display. The bottom controls also provide Back and Home. Home returns to the main menu and clears the navigation stack; Back restores the previous screen and highlighted selection. Back is disabled at Home. Both controls can be reached with Tab and activated with Enter or Space. The flat side button is labeled HOME and returns directly to the main menu.
+
+Choose **Learn rhythm patterns** below the watch or in the main menu for a five-part guide. Each lesson includes a written explanation and a **Play example** action; Next, Previous, Finish, and Skip to home let users learn at their own pace. Play example enables rhythm sounds after the user gesture.
+
+When both feedback types are enabled, spoken guidance finishes first, followed by a 250 ms pause and then the rhythm. A visible status identifies the speaking and rhythm phases. Starting a new action cancels stale feedback, and hiding the page stops both speech and tones.
